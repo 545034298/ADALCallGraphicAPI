@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Microsoft Teams</title>
+    <meta charset="utf-8" />
+    <style type="text/css">
+        body {
+            font-family: Tahoma;
+            padding: 3em;
+        }
+    </style>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" />
+    <script src="https://secure.aadcdn.microsoftonline-p.com/lib/1.0.17/js/adal.min.js"></script>
+    <script src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.3.1.js"></script>
+</head>
+
+<body>
+    <div style="text-align:right">
+
+        <a style="float:right;" href="#" id="signOutBtn" type="button" onclick="authContext.logOut();return false;" >Sign Out</a>
+        <a style="float:right;margin-right:5px;margin-left:5px;" href="#" id="signInBtn" type="button" onclick="authContext.login();return false;" >Sign In</a>
+        <div id="username" style="margin-right:5px;"></div>
+    </div>
+    <div style="clear:both;"></div>
+    <p>
+        <h2 style="text-align:center">
+            Using ADAL to Retrieve Access Token and then call graphic api to get joined teams
+        </h2>
+    </p>
+    <div id="status" style="display:none" class="alert alert-primary" role="alert">
+    </div>
+    <div id="teamsTable" style="display:none;">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th scope="col">Id</th>
+                    <th scope="col">Display Name</th>
+                    <th scope="col">Description</th>
+                </tr>
+            </thead>
+            <tbody id="teamsBody">
+            </tbody>
+        </table>
+    </div>
+    <script type="text/javascript">
+        var authContext = new AuthenticationContext({
+            clientId: '0eea8aee-e53d-465b-985c-fbb7908ba6cf',
+            postLogoutRedirectUri: window.location.origin,
+        });
+        var getCurrentUser = function (access_token) {
+            $('#status').text('Calling Graphic API to Retrieve Teams...');
+            $.ajax({
+                method: "Get",
+                dataType: "json",
+                beforeSend: function (request) {
+                    request.setRequestHeader("Authorization", 'Bearer ' + access_token);
+                },
+                url: "https://graph.microsoft.com/beta/me/joinedteams",
+                success: function (data) {
+                    $('#status').text('Teams Retieved');
+                    var teams = data.value;
+                    teams.forEach(element => {
+                        $("#teamsBody").append('<tr><td>' + element.id + '</td><td scope="row">' + element.displayName + '</td><td scope="row">' + element.description + '</td></tr>')
+                    });
+                    $("#teamsTable").show();
+                },
+                error: function (jqXHR, textStatus, errorThrown) {
+                    $('#status').text('ERROR:\n\n' + jqXHR.responseText);
+                }
+            });
+        };
+        $('#status').show();
+        if (authContext.isCallback(window.location.hash)) {
+            authContext.handleWindowCallback();
+            var err = authContext.getLoginError();
+            if (err) {
+                $('#status').text('ERROR:\n\n' + err);
+            }
+        } else {
+            var user = authContext.getCachedUser();
+            if (user) {
+                $('#signInBtn').hide();
+                $('#signOutBtn').show();
+                $('#username').text('Signed in as: ' + user.userName);
+                $('#status').text('Getting access token...');
+                authContext.acquireToken(
+                    'https://graph.microsoft.com',
+                    function (error, token) {
+                        if (error || !token) {
+                            $('#status').text('ERROR:\n\n' + error);
+                            return;
+                        }
+                        getCurrentUser(token);
+                    }
+                );
+            } else {
+                $('#status').text('Please sign in with your tenant account');
+                $('#signInBtn').show();
+                $('#signOutBtn').hide();
+            }
+        }
+    </script>
+</body>
+</html>
